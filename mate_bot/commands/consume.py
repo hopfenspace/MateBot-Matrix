@@ -6,14 +6,14 @@ import logging
 import random as _random
 import typing as _typing
 
-import telegram
+from nio import MatrixRoom, RoomMessageText
+from hopfenmatrix.api_wrapper import ApiWrapper
 
-from mate_bot.state.user import MateBotUser, CommunityUser
+from mate_bot.state import User, Transaction
 from mate_bot.parsing.types import natural as natural_type
 from mate_bot.config import config
-from mate_bot.commands.base import BaseCommand
+from mate_bot.commands.base import BaseCommand, VOUCHED
 from mate_bot.parsing.util import Namespace
-from mate_bot.state.transactions import LoggedTransaction
 
 
 logger = logging.getLogger("commands")
@@ -27,7 +27,7 @@ class ConsumeCommand(BaseCommand):
     the constructor in order to implement a new command.
     """
 
-    def __init__(self, name: str, description: str, price: int, messages: _typing.List[str], symbol: str):
+    def __init__(self, name: str, description: str, description_formatted: str, price: int, messages: _typing.List[str], symbol: str):
         """
         :param name: name of the command
         :type name: str
@@ -39,9 +39,11 @@ class ConsumeCommand(BaseCommand):
         :type messages: typing.List[str]
         """
 
-        super().__init__(name, description)
+        super().__init__(name, description, description_formatted)
         if not self.description:
             self.description = f"Consume {name}s for {price / 100 :.2f}€ each."
+        if not self.description_formatted:
+            self.description_formatted = f"Consume {name}s for {price / 100 :.2f}€ each."
 
         self.parser.add_argument("number", default=1, type=natural_type, nargs="?")
 
@@ -49,35 +51,33 @@ class ConsumeCommand(BaseCommand):
         self.messages = messages
         self.symbol = symbol
 
-    def run(self, args: Namespace, update: telegram.Update) -> None:
+    async def run(self, args: Namespace, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
         """
         :param args: parsed namespace containing the arguments
         :type args: argparse.Namespace
-        :param update: incoming Telegram update
-        :type update: telegram.Update
+        :param api: the api to respond with
+        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param room: room the message came in
+        :type room: nio.MatrixRoom
+        :param event: incoming message event
+        :type event: nio.RoomMessageText
         :return: None
         """
+        sender = await self.get_sender(api, room, event)
 
-        sender = MateBotUser(update.effective_message.from_user)
-        if not self.ensure_permissions(sender, 1, update.effective_message):
+        if not await self.ensure_permissions(sender, VOUCHED, api, event, room):
             return
 
-        if args.number > config["general"]["max-consume"]:
-            update.effective_message.reply_text(
-                "You can't consume that many goods at once!"
+        if args.number > config.general.max_consume:
+            msg = "You can't consume that many goods at once!"
+
+        else:
+            Transaction.perform(
+                sender,
+                User.community_user(),
+                self.price * args.number,
+                f"consume: {args.number}x {self.name}"
             )
-            return
+            msg = _random.choice(self.messages) + self.symbol * args.number
 
-        reason = f"consume: {args.number}x {self.name}"
-        LoggedTransaction(
-            sender,
-            CommunityUser(),
-            self.price * args.number,
-            reason,
-            update.effective_message.bot
-        ).commit()
-
-        update.effective_message.reply_text(
-            _random.choice(self.messages) + self.symbol * args.number,
-            disable_notification=True
-        )
+        await api.send_reply(msg, room, event, send_as_notice=True)

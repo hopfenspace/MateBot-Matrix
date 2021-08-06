@@ -4,7 +4,7 @@ MateBot's CommandParser
 
 import typing
 
-import telegram
+from nio import RoomMessageText
 
 from mate_bot.err import ParsingError
 from mate_bot.parsing.util import EntityString, Namespace, Representable
@@ -60,7 +60,7 @@ class CommandParser(Representable):
         self._usages.append(CommandUsage())
         return self._usages[-1]
 
-    def parse(self, msg: telegram.Message) -> Namespace:
+    def parse(self, msg: RoomMessageText) -> Namespace:
         """
         Parse a telegram message into a namespace.
 
@@ -75,9 +75,8 @@ class CommandParser(Representable):
         # Split message into argument strings
         arg_strings = list(self._split(msg))
 
-        # Remove possible bot command
-        if arg_strings and arg_strings[0].entity.type == "bot_command":
-            arg_strings = arg_strings[1:]
+        # Remove bot command
+        arg_strings = arg_strings[1:]
 
         # Parse
         return self._parse(arg_strings)
@@ -213,22 +212,17 @@ class CommandParser(Representable):
         return namespace
 
     @staticmethod
-    def _split(msg: telegram.Message) -> typing.Iterator[EntityString]:
+    def _split(event: RoomMessageText) -> typing.Iterator[EntityString]:
         """
-        Split a telegram message into EntityStrings
+        Currently unused.
 
-        This functions splits by spaces while keeping entities intact.
-
-        Danger!!!
-        Nested entities would probably break this.
-
-        :param msg: telegram message to tokenize
-        :type msg: telegram.Message
+        :param event: event to process
+        :type event: nio.RoomMessageText
         :return: list of argument strings
         :rtype: Iterator[EntityString]
         """
 
-        last_entity = 0
+        """last_entity = 0
 
         for entity in msg.entities:
             # If there is normal text left before the next entity
@@ -240,4 +234,6 @@ class CommandParser(Representable):
 
         # Return left over text which might be after the last entity
         if msg.text[last_entity:]:
-            yield from map(EntityString, filter(bool, msg.text[last_entity:].split()))
+            yield from map(EntityString, filter(bool, msg.text[last_entity:].split()))"""
+
+        yield from event.stripped_body.split()

@@ -4,10 +4,11 @@ MateBot command executor classes for /balance
 
 import logging
 
-import telegram
+from nio import MatrixRoom, RoomMessageText
+from hopfenmatrix.api_wrapper import ApiWrapper
 
-from mate_bot.state.user import MateBotUser
-from mate_bot.commands.base import BaseCommand
+from mate_bot.state import User
+from mate_bot.commands.base import BaseCommand, INTERNAL
 from mate_bot.parsing.types import user as user_type
 from mate_bot.parsing.util import Namespace
 
@@ -27,24 +28,37 @@ class BalanceCommand(BaseCommand):
             "When you use this command without arguments, the bot will "
             "reply with your current amount of money stored in your virtual "
             "wallet. If you specify a username or mention someone as an argument,"
+            "the 'balance' of this user is returned instead of yours.",
+            "Use this command to show a user's balance.\n\n"
+            "When you use this command without arguments, the bot will "
+            "reply with your current amount of money stored in your virtual "
+            "wallet. If you specify a username or mention someone as an argument,"
             "the 'balance' of this user is returned instead of yours."
         )
 
         self.parser.add_argument("user", type=user_type, nargs="?")
 
-    def run(self, args: Namespace, update: telegram.Update) -> None:
+    async def run(self, args: Namespace, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
         """
         :param args: parsed namespace containing the arguments
         :type args: argparse.Namespace
-        :param update: incoming Telegram update
-        :type update: telegram.Update
+        :param api: the api to respond with
+        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param room: room the message came in
+        :type room: nio.MatrixRoom
+        :param event: incoming message event
+        :type event: nio.RoomMessageText
         :return: None
         """
+        sender = await self.get_sender(api, room, event)
 
         if args.user:
-            user = args.user
-            update.effective_message.reply_text(f"Balance of {user.name} is: {user.balance / 100 : .2f}€")
+            if not await self.ensure_permissions(sender, INTERNAL, api, event, room):
+                return
+
+            msg = f"Balance of {args.user} is: {args.user.balance / 100 : .2f}€"
 
         else:
-            user = MateBotUser(update.effective_message.from_user)
-            update.effective_message.reply_text(f"Your balance is: {user.balance / 100 :.2f}€")
+            msg = f"Your balance is: {sender.balance / 100 :.2f}€"
+
+        await api.send_reply(msg, room, event, send_as_notice=True)

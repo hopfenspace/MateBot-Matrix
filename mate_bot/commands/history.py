@@ -6,10 +6,10 @@ import json
 import logging
 import tempfile
 
-import telegram
+from nio import MatrixRoom, RoomMessageText, UploadResponse
+from hopfenmatrix.api_wrapper import ApiWrapper
 
-from mate_bot.state.user import MateBotUser
-from mate_bot.state.transactions import TransactionLog
+from mate_bot.state import Transaction
 from mate_bot.parsing.types import natural as natural_type
 from mate_bot.parsing.util import Namespace
 from mate_bot.commands.base import BaseCommand
@@ -31,7 +31,15 @@ class HistoryCommand(BaseCommand):
             "10) which will be returned by the bot. Using a huge number will "
             "just print all your transactions, maybe in multiple messages.\n\n"
             "You could also export the whole history of your personal transactions "
-            "as downloadable file. Currently supported formats are `csv` and `json`. "
+            "as downloadable file. Currently supported formats are csv and json. "
+            "Just add one of those two format specifiers after the command. Note "
+            "that this variant is restricted to your personal chat with the bot.",
+            "Use this command to get an overview of your transactions.<br /><br />"
+            "You can specify the number of most recent transactions (default "
+            "10) which will be returned by the bot. Using a huge number will "
+            "just print all your transactions, maybe in multiple messages.<br /><br />"
+            "You could also export the whole history of your personal transactions "
+            "as downloadable file. Currently supported formats are <code>csv</code> and <code>json</code>. "
             "Just add one of those two format specifiers after the command. Note "
             "that this variant is restricted to your personal chat with the bot."
         )
@@ -49,123 +57,55 @@ class HistoryCommand(BaseCommand):
             choices=("json", "csv")
         )
 
-    def run(self, args: Namespace, update: telegram.Update) -> None:
+    async def run(self, args: Namespace, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
         """
         :param args: parsed namespace containing the arguments
         :type args: argparse.Namespace
-        :param update: incoming Telegram update
-        :type update: telegram.Update
+        :param api: the api to respond with
+        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param room: room the message came in
+        :type room: nio.MatrixRoom
+        :param event: incoming message event
+        :type event: nio.RoomMessageText
         :return: None
         """
+        user = await self.get_sender(api, room, event)
 
-        if args.export is None:
-            self._handle_report(args, update)
-        else:
-            self._handle_export(args, update)
+        logs = Transaction.history(user, args.length)
 
-    @staticmethod
-    def _handle_export(args: Namespace, update: telegram.Update) -> None:
-        """
-        Handle the request to export the full transaction log of a user
-
-        :param args: parsed namespace containing the arguments
-        :type args: argparse.Namespace
-        :param update: incoming Telegram update
-        :type update: telegram.Update
-        :return: None
-        """
-
-        if update.effective_chat.type != update.effective_chat.PRIVATE:
-            update.effective_message.reply_text("This command can only be used in private chat.")
-            return
-
-        user = MateBotUser(update.effective_message.from_user)
-
-        if args.export == "json":
-
-            logs = TransactionLog(user).to_json()
-            if len(logs) == 0:
-                update.effective_message.reply_text("You don't have any registered transactions yet.")
-                return
-
-            with tempfile.TemporaryFile(mode="w+b") as file:
-                file.write(json.dumps(logs, indent=4).encode("UTF-8"))
-                file.seek(0)
-
-                update.effective_message.reply_document(
-                    document=file,
-                    filename="transactions.json",
-                    caption=(
-                        "You requested the export of your transaction log. "
-                        f"This file contains all known transactions of {user.name}."
-                    )
-                )
-
-        elif args.export == "csv":
-
-            content = TransactionLog(user).to_csv(True)
-            if content is None:
-                update.effective_message.reply_text("You don't have any registered transactions yet.")
-                return
-
-            with tempfile.TemporaryFile(mode="w+b") as file:
-                file.write(content.encode("UTF-8"))
-                file.seek(0)
-
-                update.effective_message.reply_document(
-                    document=file,
-                    filename="transactions.csv",
-                    caption=(
-                        "You requested the export of your transaction log. "
-                        f"This file contains all known transactions of {user.name}."
-                    )
-                )
-
-    @staticmethod
-    def _handle_report(args: Namespace, update: telegram.Update) -> None:
-        """
-        Handle the request to report the most current transaction entries of a user
-
-        :param args: parsed namespace containing the arguments
-        :type args: argparse.Namespace
-        :param update: incoming Telegram update
-        :type update: telegram.Update
-        :return: None
-        """
-
-        user = MateBotUser(update.effective_message.from_user)
-        logs = TransactionLog(user, args.length).to_list()
-        log = "\n".join(logs)
-        heading = f"Transaction history for {user.name}:\n```"
         if len(logs) == 0:
-            update.effective_message.reply_text("You don't have any registered transactions yet.")
-            return
+            msg = "You don't have any registered transactions yet."
+            await api.send_reply(msg, room, event, send_as_notice=True)
 
-        if update.effective_message.chat.type != update.effective_chat.PRIVATE:
+        elif args.export is None:
+            if not await api.is_room_private(room) and len(logs) > 20:
+                msg = ("Your requested transaction logs are too long. Try a smaller "
+                       "number of entries or execute this command in private chat again.")
+                await api.send_reply(msg, room, event, send_as_notice=True)
 
-            text = f"{heading}\n{log}```"
-            if len(text) > 4096:
-                update.effective_message.reply_text(
-                    "Your requested transaction logs are too long. Try a smaller "
-                    "number of entries or execute this command in private chat again."
-                )
             else:
-                update.effective_message.reply_markdown_v2(text)
+                msg = f"Transaction history for {user}:\n\n" + "\n".join(map(str, logs))
+                formatted_msg = (f"Transaction history for {user}:<br /><br />"
+                                 f"<pre><code>{'<br />'.join(map(str, logs))}</code></pre>")
+                await api.send_reply(msg, room, event, formatted_message=formatted_msg, send_as_notice=True)
 
         else:
+            if not await api.is_room_private(room):
+                await api.send_reply("This command can only be used in private chat.", room, event, send_as_notice=True)
 
-            text = f"{heading}\n{log}```"
-            if len(text) < 4096:
-                update.effective_message.reply_markdown_v2(text)
-                return
+            else:
+                logs = list(map(Transaction.as_exportable_dict, logs))
 
-            results = [heading]
-            for entry in logs:
-                if len("\n".join(results + [entry])) > 4096:
-                    results.append("```")
-                    update.effective_message.reply_markdown_v2("\n".join(results))
-                    results = ["```"]
-                results.append(entry)
+                if args.export == "json":
+                    text = json.dumps(logs, indent=2)
 
-            if len(results) > 0:
-                update.effective_message.reply_markdown_v2("\n".join(results + ["```"]))
+                else:  # args.export == "csv":
+                    text = ";".join(logs[0].keys())
+                    for log in logs:
+                        text += "\n" + ";".join(map(str, log.values()))
+
+                with tempfile.NamedTemporaryFile(mode="w+b") as file:
+                    file.write(text.encode("utf-8"))
+                    file.seek(0)
+
+                    await api.send_file(file.name, room, description=f"transaction.{args.export}")

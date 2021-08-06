@@ -1,82 +1,42 @@
 #!/usr/bin/env python3
 
-import typing
-import logging.config
+import asyncio
+from typing import List
 
-from telegram.ext import (
-    Updater, Dispatcher, CommandHandler,
-    CallbackQueryHandler, InlineQueryHandler
-)
+from hopfenmatrix.api_wrapper import ApiWrapper
 
-from mate_bot import err
-from mate_bot import registry
 from mate_bot.config import config
-from mate_bot.commands.handler import FilteredChosenInlineResultHandler
-from mate_bot.state.dbhelper import BackendHelper
+from mate_bot.commands.base import BaseCommand
+from mate_bot.commands.help import HelpCommand
+from mate_bot.commands.balance import BalanceCommand
+from mate_bot.commands.zwegat import ZwegatCommand
+from mate_bot.commands.consume import ConsumeCommand
+from mate_bot.commands.data import DataCommand
+from mate_bot.commands.history import HistoryCommand
+from mate_bot.commands.blame import BlameCommand
 
 
-handler_types = typing.Union[
-    typing.Type[CommandHandler],
-    typing.Type[CallbackQueryHandler],
-    typing.Type[InlineQueryHandler],
-    typing.Type[FilteredChosenInlineResultHandler]
-]
+async def main():
+    api = ApiWrapper(config=config)
+    api.set_auto_join(allowed_rooms=[config.room])
 
-
-def _add(dispatcher: Dispatcher, handler: handler_types, pool: dict, pattern: bool = True) -> None:
-    """
-    Add the executors from the given pool to the dispatcher using the given handler type
-
-    :param dispatcher: Telegram's dispatcher to add the executor to
-    :type dispatcher: telegram.ext.Dispatcher
-    :param handler: type of the handler (subclass of ``telegram.ext.Handler``)
-    :type handler: handler_types
-    :param pool: collection of all executors for one handler type
-    :type pool: dict
-    :param pattern: switch whether the keys of the pool are patterns or names
-    :type pattern: bool
-    :return: None
-    """
-
-    logger.info(f"Adding {handler.__name__} executors...")
-    for name in pool:
-        if pattern:
-            dispatcher.add_handler(handler(pool[name], pattern=name))
+    def register_command(cmd: BaseCommand, aliases: List[str] = None):
+        if aliases is None:
+            api.register_command(cmd, [cmd.name])
         else:
-            dispatcher.add_handler(handler(name, pool[name]))
+            api.register_command(cmd, [cmd.name] + aliases)
 
+    register_command(HelpCommand())
+    register_command(BalanceCommand())
+    register_command(ZwegatCommand())
+    register_command(DataCommand())
+    register_command(HistoryCommand())
+    register_command(BlameCommand())
+    for consumable in config.consumables:
+        register_command(ConsumeCommand(**consumable))
 
-class NoDebugFilter(logging.Filter):
-    """
-    Logging filter that filters out any DEBUG message for the specified logger or handler
-    """
-
-    def filter(self, record: logging.LogRecord) -> int:
-        if super().filter(record):
-            return record.levelno > logging.DEBUG
-        return True
+    await api.start_bot()
 
 
 if __name__ == "__main__":
-    logging.config.dictConfig(config["logging"])
-    for handler in logging.root.handlers:
-        handler.addFilter(NoDebugFilter("telegram"))
-    logger = logging.getLogger()
-    BackendHelper.db_config = config["database"]
-    BackendHelper.query_logger = logging.getLogger("database")
-    BackendHelper.get_value("users")
-
-    logger.debug("Registering bot token with Updater...")
-    updater = Updater(config["token"], use_context = True)
-
-    logger.info("Adding error handler...")
-    updater.dispatcher.add_error_handler(err.log_error)
-
-    _add(updater.dispatcher, CommandHandler, registry.commands, False)
-    _add(updater.dispatcher, CallbackQueryHandler, registry.callback_queries, True)
-    _add(updater.dispatcher, InlineQueryHandler, registry.inline_queries, True)
-    _add(updater.dispatcher, FilteredChosenInlineResultHandler, registry.inline_results, True)
-
-    logger.info("Starting bot...")
-    updater.start_polling()
-    updater.idle()
+    asyncio.get_event_loop().run_until_complete(main())

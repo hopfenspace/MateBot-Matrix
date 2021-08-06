@@ -5,17 +5,24 @@ MateBot command handling base library
 import typing
 import logging
 
-import telegram.ext
+from nio import MatrixRoom, RoomMessageText
+from hopfenmatrix.api_wrapper import ApiWrapper
 
+from mate_bot.state import User
 from mate_bot import registry
-from mate_bot.config import config
 from mate_bot.err import ParsingError
 from mate_bot.parsing.parser import CommandParser
 from mate_bot.parsing.util import Namespace
-from mate_bot.state.user import MateBotUser
+from mate_bot.config import config
 
 
 logger = logging.getLogger("commands")
+
+
+ANYONE = 0
+VOUCHED = 1
+INTERNAL = 2
+TRUSTED = 3
 
 
 class BaseCommand:
@@ -44,14 +51,17 @@ class BaseCommand:
     :type name: str
     :param description: a multiline string describing what the command does
     :type description: str
+    :param description_formatted: a multiline string describing what the command does. Formatted with html.
+    :type description_formatted: str
     :param usage: a single line string showing the basic syntax
     :type usage: Optional[str]
     """
 
-    def __init__(self, name: str, description: str, usage: typing.Optional[str] = None):
+    def __init__(self, name: str, description: str, description_formatted:str, usage: typing.Optional[str] = None):
         self.name = name
         self._usage = usage
         self.description = description
+        self.description_formatted = description_formatted
         self.parser = CommandParser(self.name)
 
         registry.commands[self.name] = self
@@ -63,11 +73,11 @@ class BaseCommand:
         """
 
         if self._usage is None:
-            return f"/{self.name} {self.parser.default_usage}"
+            return f"!{self.name} {self.parser.default_usage}"
         else:
             return self._usage
 
-    def run(self, args: Namespace, update: telegram.Update) -> None:
+    async def run(self, args: Namespace, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
         """
         Perform command-specific actions
 
@@ -75,26 +85,90 @@ class BaseCommand:
 
         :param args: parsed namespace containing the arguments
         :type args: argparse.Namespace
-        :param update: incoming Telegram update
-        :type update: telegram.Update
+        :param api: the api to respond with
+        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param room: room the message came in
+        :type room: nio.MatrixRoom
+        :param event: incoming message event
+        :type event: nio.RoomMessageText
         :return: None
         :raises NotImplementedError: because this method should be overwritten by subclasses
         """
 
         raise NotImplementedError("Overwrite the BaseCommand.run() method in a subclass")
 
-    def ensure_permissions(self, user: MateBotUser, level: int, msg: telegram.Message) -> bool:
+    async def __call__(self, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
+        """
+        Parse arguments of the incoming event and execute the .run() method
+
+        This method is the callback method used by `AsyncClient.add_callback_handler`.
+
+        :param api: the api to respond with
+        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param room: room the message came in
+        :type room: nio.MatrixRoom
+        :param event: incoming message event
+        :type event: nio.RoomMessageText
+        :return: None
+        """
+        try:
+            logger.debug(f"{type(self).__name__} by {event.sender}")
+
+            """if self.name != "start":
+                if MateBotUser.get_uid_from_tid(event.sender) is None:
+                    #update.effective_message.reply_text("You need to /start first.")
+                    return
+
+                #user = MateBotUser(event.sender)
+                #self._verify_internal_membership(update, user, context.bot)"""
+
+            args = self.parser.parse(event)
+            logger.debug(f"Parsed command's arguments: {args}")
+            await self.run(args, api, room, event)
+
+        except ParsingError as err:
+            await api.send_message(str(err), room, event, send_as_notice=True)
+
+    @staticmethod
+    async def get_sender(api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> User:
+        try:
+            user = User.get(event.sender)
+        except ValueError:
+            user = User.new(event.sender)
+            await api.send_reply(f"Welcome {user}, please enjoy your drinks", room, event, send_as_notice=True)
+
+            if room.room_id != config.room:
+                user.external = True
+
+        display_name = (await api.client.get_displayname(user.matrix_id)).displayname
+        if display_name != user.display_name:
+            user.display_name = display_name
+            user.push()
+
+        if room.room_id == config.room and user.external:
+            user.external = False
+            await api.send_reply(f"{user}, you are now an internal.", room, event, send_as_notice=True)
+
+        return user
+
+    async def ensure_permissions(
+            self,
+            user: User,
+            level: int,
+            api: ApiWrapper,
+            event: RoomMessageText,
+            room: MatrixRoom
+    ) -> bool:
         """
         Ensure that a user is allowed to perform an operation that requires specific permissions
 
-        The parameter ``level`` is an integer and determines the required
+        The parameter ``level`` is a constant and determines the required
         permission level. It's not calculated but rather interpreted:
 
-          * ``0`` means that any user is allowed to perform the task
-          * ``1`` means that any internal user or external user with voucher is allowed
-          * ``2`` means that only internal users are allowed
-          * ``3`` means that only internal users with vote permissions are allowed
-          * any other value will lead to a ValueError
+          * ``ANYONE`` means that any user is allowed to perform the task
+          * ``VOUCHED`` means that any internal user or external user with voucher is allowed
+          * ``INTERNAL`` means that only internal users are allowed
+          * ``TRUSTED`` means that only internal users with vote permissions are allowed
 
         .. note::
 
@@ -107,50 +181,46 @@ class BaseCommand:
         :type user: MateBotUser
         :param level: minimal required permission level to be allowed to perform some action
         :type level: int
-        :param msg: incoming message containing the command in question
-        :type msg: telegram.Message
+        :param api: api to reply with
+        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param event: event to reply to
+        :type event: nio.RoomMessageText
+        :param room: room to reply in
+        :type room: nio.MatrixRoom
         :return: whether further access should be allowed (``True``) or not
         :rtype: bool
-        :raises TypeError: when the level is no integer
-        :raises ValueError: when the level is not one of the accepted integer values
         """
-
-        if not isinstance(level, int):
-            raise TypeError(f"Expected int as level, got {type(level)} instead")
-        if level not in range(4):
-            raise ValueError(f"Permission level {level} out of range 0-3")
-
-        if level == 0:
-            return True
-
-        if level == 1 and user.external and user.creditor is None:
-            msg.reply_text(
+        if level == VOUCHED and user.external and user.creditor is None:
+            msg = (
                 f"You can't perform {self.name}. You are an external user "
                 "without creditor. For security purposes, every external user "
                 "needs an internal voucher. Use /help for more information."
             )
-            return False
 
-        if level == 2 and user.external:
-            msg.reply_text(
+        elif level == INTERNAL and user.external:
+            msg = (
                 f"You can't perform {self.name}. You are an external user. "
                 "To perform this command, you must be marked as internal user. "
                 "Send any command to an internal chat to update your privileges."
             )
-            return False
 
-        if level == 3 and not user.permission:
-            msg.reply_text(
+        elif level == TRUSTED and not user.permission:
+            msg = (
                 f"You can't perform {self.name}. You don't have permissions to vote."
             )
-            return False
 
-        return True
+        else:
+            return True
 
+        await api.send_reply(msg, room, event, send_as_notice=True)
+        return False
+
+
+'''
     def _verify_internal_membership(
             self,
             update: telegram.Update,
-            user: MateBotUser,
+            user: "MateBotUser",
             bot: telegram.Bot
     ) -> None:
         """
@@ -181,42 +251,10 @@ class BaseCommand:
             bot.send_message(
                 user.tid,
                 f"You receive this message because you executed /{self.name} in "
-                f"an internal chat. It looks like {MateBotUser(creditor)} vouches "
+                "an internal chat. It looks like {MateBotUser(creditor)} vouches "
                 f"for you. You can't have a voucher when you try to become an internal "
                 f"user. Therefore, your account status was not updated."
             )
-
-    def __call__(self, update: telegram.Update, context: telegram.ext.CallbackContext) -> None:
-        """
-        Parse arguments of the incoming update and execute the .run() method
-
-        This method is the callback method used by telegram.CommandHandler.
-        Note that this method also catches any exceptions and prints them.
-
-        :param update: incoming Telegram update
-        :type update: telegram.Update
-        :param context: Telegram callback context
-        :type context: telegram.ext.CallbackContext
-        :return: None
-        """
-
-        try:
-            logger.debug(f"{type(self).__name__} by {update.effective_message.from_user.name}")
-
-            if self.name != "start":
-                if MateBotUser.get_uid_from_tid(update.effective_message.from_user.id) is None:
-                    update.effective_message.reply_text("You need to /start first.")
-                    return
-
-                user = MateBotUser(update.effective_message.from_user)
-                self._verify_internal_membership(update, user, context.bot)
-
-            args = self.parser.parse(update.effective_message)
-            logger.debug(f"Parsed command's arguments: {args}")
-            self.run(args, update)
-
-        except ParsingError as err:
-            update.effective_message.reply_markdown(str(err))
 
 
 class BaseCallbackQuery:
@@ -466,3 +504,4 @@ class BaseInlineResult:
         """
 
         raise NotImplementedError("Overwrite the BaseInlineQuery.run() method in a subclass")
+'''

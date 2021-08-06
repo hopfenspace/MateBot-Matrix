@@ -30,7 +30,15 @@ class SendCommand(BaseCommand):
             "Obviously, the receiver of your transaction has to be registered with "
             "this bot. For security purposes, the bot will ask you to confirm your "
             "proposed transaction before the virtual money will be transferred.\n\n"
-            "The first and second argument, `amount` and `receiver` respectively, are "
+            "The first and second argument, amount and receiver respectively, are "
+            "mandatory. But you can add as many extra words as you want afterwards. "
+            "Those are treated as description/reason for your transaction.",
+            "Use this command to send money to another user.<br /><br />"
+            "Performing this command allows you to send money to someone else. "
+            "Obviously, the receiver of your transaction has to be registered with "
+            "this bot. For security purposes, the bot will ask you to confirm your "
+            "proposed transaction before the virtual money will be transferred.<br /><br />"
+            "The first and second argument, <code>amount</code> and <code>receiver</code> respectively, are "
             "mandatory. But you can add as many extra words as you want afterwards. "
             "Those are treated as description/reason for your transaction."
         )
@@ -47,8 +55,8 @@ class SendCommand(BaseCommand):
         :type update: telegram.Update
         :return: None
         """
+        sender = self.get_sender(api, room, event)
 
-        sender = MateBotUser(update.effective_message.from_user)
         if isinstance(args.reason, list):
             reason = "send: " + " ".join(args.reason)
         else:
