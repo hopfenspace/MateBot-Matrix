@@ -1,28 +1,36 @@
 """
-MateBot configuration provider
+MateBot Matrix configuration provider
 """
+
 import logging.config
 
 from hopfenmatrix.config import Config, Namespace
 
 
 class MateBotConfig(Config):
-
     def __init__(self):
         super(MateBotConfig, self).__init__()
         del self["logging"]
 
         self.room = ""
 
-        self.general = Namespace()
-        self.general.max_amount = 10000
-        self.general.max_consume = 10
-        self.general.db_localtime = False
+        self.api = Namespace()
+        self.api.base_url = "<Base URL to the MateBot backend server>"
+        self.api.app_name = "<Name of your deployed application>"
+        self.api.app_password = "<Password of your deployed application>"
+        self.api.ca_path = None
 
-        self.community = Namespace()
-        self.community.payment_consent = 2
-        self.community.payment_denial = 2
-        self.community.multiple_externals = True
+        self.api.callback = Namespace()
+        self.api.callback.enabled = True
+        self.api.callback.address = "127.0.0.1"
+        self.api.callback.port = 8080
+        self.api.callback.public_url = "<Public base URL of the callback server (reachable by the API server)>"
+        self.api.callback.username = None
+        self.api.callback.password = None
+
+        self.client = Namespace()
+        self.client.adjust_stock = True
+        self.client.respect_stock = True
 
         self.database = Namespace()
         self.database.host = "localhost"
@@ -31,9 +39,6 @@ class MateBotConfig(Config):
         self.database.user = "matebot_user"
         self.database.password = "password"
         self.database.charset = "utf8mb4"
-
-        self.testing = Namespace()
-        self.testing.db = "mate_db_test"
 
         self.logging = Namespace()
         self.logging.version = 1
@@ -71,7 +76,7 @@ class MateBotConfig(Config):
             "class": "logging.handlers.WatchedFileHandler",
             "formatter": "file",
             "filters": ["no_peewee_debug"],
-            "filename": "matebot.log",
+            "filename": "matebot_matrix.log",
             "encoding": "UTF-8"
         }
         self.logging.filters.no_peewee_debug = {
@@ -80,65 +85,5 @@ class MateBotConfig(Config):
             "level": logging.INFO
         }
 
-        self.logging.loggers = Namespace()
-        self.logging.loggers.collectives = {}
-        self.logging.loggers.commands = {}
-        self.logging.loggers.config = {}
-        self.logging.loggers.database = {}
-        self.logging.loggers.error = {}
-        self.logging.loggers.state = {}
-
-        self.consumables = [
-            {
-                "name": "drink",
-                "description": "",
-                "description_formatted": "",
-                "price": 100,
-                "messages": [
-                    "Okay, enjoy your "
-                ],
-                "symbol": "\uD83E\uDDC9"
-            },
-            {
-                "name": "water",
-                "description": "",
-                "description_formatted": "",
-                "price": 50,
-                "messages": [
-                    "HYDRATION! ",
-                    "Hydrier dich mit ",
-                    "Hydrieren sie sich bitte mit ",
-                    "Der Bahnbabo sagt: Hydriert euch mit ",
-                    "Okay, enjoy your "
-                ],
-                "symbol": "\uD83D\uDCA7"
-            },
-            {
-                "name": "pizza",
-                "description": "",
-                "description_formatted": "",
-                "price": 200,
-                "messages": [
-                    "Okay, enjoy your ",
-                    "Buon appetito! "
-                ],
-                "symbol": "\uD83C\uDF55"
-            },
-            {
-                "name": "ice",
-                "description": "",
-                "description_formatted": "",
-                "price": 50,
-                "messages": [
-                    "Okay, enjoy your ",
-                    "Hmmh, yummy... "
-                ],
-                "symbol": "\uD83C\uDF68"
-            }
-        ]
-
     def setup_logging(self):
         logging.config.dictConfig(self.logging)
-
-
-config = MateBotConfig.from_json("config.json")
