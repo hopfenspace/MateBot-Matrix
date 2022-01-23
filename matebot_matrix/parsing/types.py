@@ -5,10 +5,9 @@ See :class:`mate_bot.parsing.actions.Action`'s type parameter
 
 import re
 
-from mate_bot import registry
-from mate_bot.state import User
-from mate_bot.commands.base import BaseCommand
-from mate_bot.config import config
+from .. import registry
+from ..state import User
+from ..commands.base import BaseCommand
 
 
 __amount_pattern = re.compile(r"^(\d+)(?:[,.](\d)(\d)?)?$")

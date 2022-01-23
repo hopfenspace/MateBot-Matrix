@@ -5,8 +5,8 @@ MateBot parser's actions class defining arguments.
 from typing import Optional
 import typing
 
-from mate_bot.err import ParsingError
-from mate_bot.parsing.util import Namespace, Representable
+from ..err import ParsingError
+from .util import Namespace, Representable
 
 
 class Action(Representable):

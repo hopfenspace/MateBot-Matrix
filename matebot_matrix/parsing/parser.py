@@ -6,11 +6,11 @@ import typing
 
 from nio import RoomMessageText
 
-from mate_bot.err import ParsingError
-from mate_bot.parsing.util import EntityString, Namespace, Representable
-from mate_bot.parsing.usage import CommandUsage
-from mate_bot.parsing.actions import Action
-from mate_bot.parsing.formatting import plural_s
+from ..err import ParsingError
+from .util import EntityString, Namespace, Representable
+from .usage import CommandUsage
+from .actions import Action
+from .formatting import plural_s
 
 
 class CommandParser(Representable):
