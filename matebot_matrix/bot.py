@@ -43,3 +43,4 @@ class MateBot(MatrixBot):
     async def start_bot(self):
         await self.sdk.setup()
         await super().start_bot()
+        await self.sdk.close()

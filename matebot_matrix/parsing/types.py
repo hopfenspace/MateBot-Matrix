@@ -6,7 +6,6 @@ See :class:`mate_bot.parsing.actions.Action`'s type parameter
 import re
 
 from ..state import User
-from ..commands import COMMANDS
 from ..commands.base import BaseCommand
 
 
@@ -90,6 +89,7 @@ def command(arg: str) -> BaseCommand:
     """
 
     try:
+        from ..commands import COMMANDS
         return COMMANDS[arg.lower()]
     except KeyError:
         raise ValueError(f"{arg} is an unknown command")
