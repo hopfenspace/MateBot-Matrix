@@ -5,8 +5,8 @@ See :class:`mate_bot.parsing.actions.Action`'s type parameter
 
 import re
 
-from .. import registry
 from ..state import User
+from ..commands import COMMANDS
 from ..commands.base import BaseCommand
 
 
@@ -44,8 +44,6 @@ def amount(arg: str) -> int:
 
     if val == 0:
         raise ValueError("An amount can't be zero")
-    elif val > config["general"]["max-amount"]:
-        raise ValueError("The amount is too high")
 
     return val
 
@@ -92,6 +90,6 @@ def command(arg: str) -> BaseCommand:
     """
 
     try:
-        return registry.commands[arg.lower()]
+        return COMMANDS[arg.lower()]
     except KeyError:
         raise ValueError(f"{arg} is an unknown command")

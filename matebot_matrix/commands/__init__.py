@@ -1,17 +1,14 @@
 """
-MateBot collection of command executors
+Collection of command executors
 """
 
-'''
-from mate_bot.commands.communism import CommunismCommand, CommunismCallbackQuery
-from mate_bot.commands.forward import ForwardInlineQuery, ForwardInlineResult
-from mate_bot.commands.pay import PayCommand, PayCallbackQuery
-from mate_bot.commands.send import SendCommand, SendCallbackQuery
-from mate_bot.commands.vouch import VouchCommand, VouchCallbackQuery
+from .balance import BalanceCommand
 
-CommunismCommand()
-HistoryCommand()
-PayCommand()
-SendCommand()
-VouchCommand()
-'''
+
+COMMANDS = {
+    cmd.name: cmd for cmd in [
+        BalanceCommand()
+    ]
+}
+
+__all__ = ["COMMANDS"]
