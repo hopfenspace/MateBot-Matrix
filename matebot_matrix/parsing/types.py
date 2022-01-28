@@ -5,6 +5,9 @@ See :class:`mate_bot.parsing.actions.Action`'s type parameter
 
 import re
 
+from matebot_sdk.exceptions import UserAPIException
+
+from ..bot import MateBot
 from ..state import User
 from ..commands.base import BaseCommand
 
@@ -18,7 +21,7 @@ __amount_pattern = re.compile(r"^(\d+)(?:[,.](\d)(\d)?)?$")
 # 1st group: leading number, 2nd group: 1st decimal, 3rd group: 2nd decimal
 
 
-def amount(arg: str) -> int:
+def amount(arg: str, **_) -> int:
     """
     Convert the string into an amount of money.
 
@@ -47,7 +50,7 @@ def amount(arg: str) -> int:
     return val
 
 
-def natural(arg: str) -> int:
+def natural(arg: str, **_) -> int:
     """
     Convert the string into a natural number (positive integer)
 
@@ -64,20 +67,26 @@ def natural(arg: str) -> int:
     return result
 
 
-def user(arg: str) -> User:
+async def user(arg: str, bot: MateBot) -> User:
     """
     Convert the string into a MateBot user as defined in the ``state`` package
 
     :param arg: string to be parsed
     :type arg: EntityString
+    :param bot: MateBot to allow querying the API server
+    :type arg: matebot_matrix.bot.MateBot
     :return: fully functional MateBot user
     :rtype: User
     :raises ValueError: when username is ambiguous or the argument wasn't a mention
     """
-    return User.get(arg)
+
+    try:
+        return await bot.sdk.get_user_by_app_alias(arg)
+    except UserAPIException as exc:
+        raise ValueError(exc.message) from exc
 
 
-def command(arg: str) -> BaseCommand:
+def command(arg: str, **_) -> BaseCommand:
     """
     Convert the string into a command with this name
 

@@ -100,7 +100,7 @@ class BaseCommand:
 
         try:
             self.logger.debug(f"{type(self).__name__} by {event.sender}")
-            args = self.parser.parse(event)
+            args = await self.parser.parse(event, bot)
             self.logger.debug(f"Parsed command's arguments: {args}")
             await self.run(args, bot, room, event)
 

@@ -3,14 +3,16 @@ MateBot's CommandParser
 """
 
 import typing
+import inspect
 
 from nio import RoomMessageText
 
-from ..err import ParsingError
 from .util import EntityString, Namespace, Representable
 from .usage import CommandUsage
 from .actions import Action
 from .formatting import plural_s
+from ..bot import MateBot
+from ..err import ParsingError
 
 
 class CommandParser(Representable):
@@ -60,7 +62,7 @@ class CommandParser(Representable):
         self._usages.append(CommandUsage())
         return self._usages[-1]
 
-    def parse(self, msg: RoomMessageText) -> Namespace:
+    async def parse(self, msg: RoomMessageText, bot: MateBot) -> Namespace:
         """
         Parse a telegram message into a namespace.
 
@@ -68,6 +70,8 @@ class CommandParser(Representable):
 
         :param msg: message to parse
         :type msg: telegram.Message
+        :param bot: MateBot to allow querying the API server
+        :type bot: matebot_matrix.bot.MateBot
         :return: parsed arguments
         :rtype: Namespace
         """
@@ -79,9 +83,9 @@ class CommandParser(Representable):
         arg_strings = arg_strings[1:]
 
         # Parse
-        return self._parse(arg_strings)
+        return await self._parse(arg_strings, bot)
 
-    def _parse(self, arg_strings: typing.List[str]) -> Namespace:
+    async def _parse(self, arg_strings: typing.List[str], bot: MateBot) -> Namespace:
         """
         Internal function for parsing from a list of strings.
 
@@ -106,7 +110,7 @@ class CommandParser(Representable):
             else:
                 # Try the remaining ones
                 try:
-                    return self._parse_usage(usage, arg_strings)
+                    return await self._parse_usage(usage, arg_strings, bot)
                 except ParsingError as err:
                     errors.append(err)
                 continue
@@ -123,7 +127,7 @@ class CommandParser(Representable):
                 msg += f"\n`/{self._name} {usage}` {error}"
             raise ParsingError(msg)
 
-    def _parse_usage(self, usage: CommandUsage, arg_strings: typing.List[str]) -> Namespace:
+    async def _parse_usage(self, usage: CommandUsage, arg_strings: typing.List[str], bot: MateBot) -> Namespace:
         """
         Try to parse the arguments with a usage
 
@@ -131,6 +135,8 @@ class CommandParser(Representable):
         :type usage: CommandUsage
         :param arg_strings: argument strings to parse
         :type arg_strings: List[str]
+        :param bot: MateBot to allow querying the API server
+        :type bot: matebot_matrix.bot.MateBot
         :return: parsed arguments
         :rtype: Namespace
         """
@@ -144,7 +150,7 @@ class CommandParser(Representable):
         for action in usage.actions:
             setattr(namespace, action.dest, action.default)
 
-        def consume_action(local_action: Action, strings: typing.List[str]):
+        async def consume_action(local_action: Action, strings: typing.List[str]):
             """
             Use an action to consume as many argument strings as possible
             """
@@ -157,7 +163,10 @@ class CommandParser(Representable):
 
                 try:
                     # Try converting the argument string
-                    value = local_action.type(string)
+                    if inspect.iscoroutinefunction(local_action.type):
+                        value = await local_action.type(string, bot=bot)
+                    else:
+                        value = local_action.type(string, bot=bot)
 
                     # Check choices
                     if action.choices is not None and value not in action.choices:
@@ -204,7 +213,7 @@ class CommandParser(Representable):
         left_strings = list(arg_strings)
 
         for action in usage.actions:
-            consume_action(action, left_strings)
+            await consume_action(action, left_strings)
 
         if len(left_strings) > 0:
             raise ParsingError(f"Unrecognized argument{plural_s(left_strings)}: {', '.join(left_strings)}")
