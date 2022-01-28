@@ -1,25 +1,16 @@
-import asyncio
-import logging
-
 from .bot import MateBot
 from .commands import COMMANDS
 
 
 def main():
-    logger = logging.getLogger(__name__)
     bot = MateBot()
-    logger.debug("Starting bot...")
     bot.set_auto_join()
 
-    print("commands =", COMMANDS)
-    for cmd in COMMANDS:
-        bot.register_command(COMMANDS[cmd], cmd, description=COMMANDS[cmd].description, command_syntax=COMMANDS[cmd].usage)
+    for name in COMMANDS:
+        cmd = COMMANDS[name]
+        bot.register_command(cmd, name, description=cmd.description, command_syntax=cmd.usage)
 
-    try:
-        asyncio.run(bot.run())
-    except KeyboardInterrupt:
-        pass
-    logger.debug("Exiting gracefully.")
+    bot.run()
 
 
 if __name__ == "__main__":

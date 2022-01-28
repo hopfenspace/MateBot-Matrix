@@ -26,6 +26,8 @@ class MateBot(MatrixBot):
             config_class=config_class
         )
 
+        self.logger = logging.getLogger("bot")
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.sdk = AsyncSDK(
             base_url=self.config.api.base_url,
             app_name=self.config.api.app_name,
@@ -40,7 +42,16 @@ class MateBot(MatrixBot):
             logger=logging.getLogger("sdk")
         )
 
-    async def run(self):
-        await self.sdk.setup()
-        await self.start_bot()
-        await self.sdk.close()
+    def run(self):
+        async def _run():
+            self.loop = asyncio.get_event_loop()
+            await self.sdk.setup()
+            await self.start_bot()
+            await self.sdk.close()
+
+        self.logger.info("Starting bot...")
+        try:
+            asyncio.run(_run())
+        except KeyboardInterrupt:
+            pass
+        self.logger.info("Stopped bot.")
