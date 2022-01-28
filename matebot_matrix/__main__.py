@@ -16,7 +16,7 @@ def main():
         bot.register_command(COMMANDS[cmd], cmd, description=COMMANDS[cmd].description, command_syntax=COMMANDS[cmd].usage)
 
     try:
-        asyncio.run(bot.start_bot())
+        asyncio.run(bot.run())
     except KeyboardInterrupt:
         pass
     logger.debug("Exiting gracefully.")

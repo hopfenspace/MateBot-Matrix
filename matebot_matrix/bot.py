@@ -40,7 +40,7 @@ class MateBot(MatrixBot):
             logger=logging.getLogger("sdk")
         )
 
-    async def start_bot(self):
+    async def run(self):
         await self.sdk.setup()
-        await super().start_bot()
+        await self.start_bot()
         await self.sdk.close()

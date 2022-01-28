@@ -2,13 +2,13 @@
 MateBot command handling base library
 """
 
-import typing
 import logging
+from typing import Optional
 
 from hopfenmatrix.matrix import MatrixRoom, RoomMessageText
+from matebot_sdk.exceptions import APIException, APIConnectionException, UserAPIException
 
 from ..bot import MateBot
-from ..state import User
 from ..err import ParsingError
 from ..parsing.util import Namespace
 from ..parsing.parser import CommandParser
@@ -31,10 +31,8 @@ class BaseCommand:
                 super().__init__("example", "Example command")
                 self.parser.add_argument("number", type=int)
 
-            def run(self, args: argparse.Namespace, update: telegram.Update) -> None:
-                update.effective_message.reply_text(
-                    " ".join(["Example!"] * max(1, args.number))
-                )
+            async def run(self, args: Namespace, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> None:
+                await bot.send_reply(" ".join(["Example!"] * max(1, args.number)), room.room_id, event)
 
     :param name: name of the command (without the "/")
     :type name: str
@@ -46,7 +44,7 @@ class BaseCommand:
     :type usage: Optional[str]
     """
 
-    def __init__(self, name: str, description: str, description_formatted:str, usage: typing.Optional[str] = None):
+    def __init__(self, name: str, description: str, description_formatted: str, usage: Optional[str] = None):
         self.name = name
         self._usage = usage
         self.description = description
@@ -65,7 +63,7 @@ class BaseCommand:
         else:
             return self._usage
 
-    async def run(self, args: Namespace, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
+    async def run(self, args: Namespace, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> None:
         """
         Perform command-specific actions
 
@@ -73,8 +71,8 @@ class BaseCommand:
 
         :param args: parsed namespace containing the arguments
         :type args: argparse.Namespace
-        :param api: the api to respond with
-        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param bot: the Matrix Bot to use while processing the command
+        :type bot: matebot_matrix.bot.MateBot
         :param room: room the message came in
         :type room: nio.MatrixRoom
         :param event: incoming message event
@@ -85,40 +83,49 @@ class BaseCommand:
 
         raise NotImplementedError("Overwrite the BaseCommand.run() method in a subclass")
 
-    async def __call__(self, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
+    async def __call__(self, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> None:
         """
         Parse arguments of the incoming event and execute the .run() method
 
         This method is the callback method used by `AsyncClient.add_callback_handler`.
 
-        :param api: the api to respond with
-        :type api: hopfenmatrix.api_wrapper.ApiWrapper
+        :param bot: the api to respond with
+        :type bot: matebot_matrix.bot.MateBot
         :param room: room the message came in
         :type room: nio.MatrixRoom
         :param event: incoming message event
         :type event: nio.RoomMessageText
         :return: None
         """
+
         try:
-            logger.debug(f"{type(self).__name__} by {event.sender}")
-
-            """if self.name != "start":
-                if MateBotUser.get_uid_from_tid(event.sender) is None:
-                    #update.effective_message.reply_text("You need to /start first.")
-                    return
-
-                #user = MateBotUser(event.sender)
-                #self._verify_internal_membership(update, user, context.bot)"""
-
+            self.logger.debug(f"{type(self).__name__} by {event.sender}")
             args = self.parser.parse(event)
-            logger.debug(f"Parsed command's arguments: {args}")
-            await self.run(args, api, room, event)
+            self.logger.debug(f"Parsed command's arguments: {args}")
+            await self.run(args, bot, room, event)
 
-        except ParsingError as err:
-            await api.send_message(str(err), room, event, send_as_notice=True)
+        except ParsingError as exc:
+            await bot.send_reply(str(exc), room.room_id, event, send_as_notice=True)
 
-    @staticmethod
-    async def get_sender(api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> User:
+        except APIConnectionException as exc:
+            self.logger.exception(f"API connectivity problem @ {type(self).__name__} ({exc.exc})")
+            await bot.send_reply(f"I'm having networking problems. {exc.message}", room.room_id, event)
+
+        except UserAPIException as exc:
+            self.logger.debug(f"{type(exc).__name__}: {exc.message} ({exc.status}, {exc.details})")
+            await bot.send_reply(exc.message, room.room_id, event)
+
+        except APIException as exc:
+            self.logger.warning(f"APIException @ {type(self).__name__} ({exc.status}, {exc.details})", exc_info=True)
+            await bot.send_reply(f"The command couldn't be executed.\n{exc.message}", room.room_id, event)
+
+    '''
+    async def get_sender(self, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> User:
+        self.logger.debug(event.sender)
+
+        # event attributes & methods: 'body', 'decrypted', 'event_id', 'flattened', 'format', 'formatted_body', 'from_dict', 'parse_decrypted_event', 'parse_encrypted_event', 'parse_event', 'room_id', 'sender', 'sender_key', 'server_timestamp', 'session_id', 'source', 'stripped_body', 'transaction_id', 'verified'
+
+        sender = await bot.sdk.get_user_by_app_alias(str(event.sender))
         try:
             user = User.get(event.sender)
         except ValueError:
@@ -143,7 +150,7 @@ class BaseCommand:
             self,
             user: User,
             level: int,
-            api: ApiWrapper,
+            api: MateBot,
             event: RoomMessageText,
             room: MatrixRoom
     ) -> bool:
@@ -202,3 +209,4 @@ class BaseCommand:
 
         await api.send_reply(msg, room, event, send_as_notice=True)
         return False
+    '''
