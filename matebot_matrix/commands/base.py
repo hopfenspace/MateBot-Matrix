@@ -89,7 +89,7 @@ class BaseCommand:
 
         This method is the callback method used by `AsyncClient.add_callback_handler`.
 
-        :param bot: the api to respond with
+        :param bot: the Matrix Bot to use while processing the command
         :type bot: matebot_matrix.bot.MateBot
         :param room: room the message came in
         :type room: nio.MatrixRoom
