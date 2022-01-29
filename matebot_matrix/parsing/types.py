@@ -5,10 +5,10 @@ See :class:`mate_bot.parsing.actions.Action`'s type parameter
 
 import re
 
+from matebot_sdk.schemas import User
 from matebot_sdk.exceptions import UserAPIException
 
 from ..bot import MateBot
-from ..state import User
 from ..commands.base import BaseCommand
 
 

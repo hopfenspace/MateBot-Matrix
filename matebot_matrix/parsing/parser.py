@@ -81,7 +81,9 @@ class CommandParser(Representable):
         arg_strings = _split_message(msg)
 
         # Remove bot command
-        arg_strings = arg_strings[1:]
+        if arg_strings[0] == bot.config.matrix.command_prefix:
+            arg_strings.pop(0)
+        arg_strings.pop(0)
 
         # Parse
         return await self._parse(arg_strings, bot)
@@ -287,4 +289,4 @@ def _split_message(event: RoomMessageText) -> List[str]:
         return p.elements
 
     else:
-        return event.stripped_body.split()
+        return event.body.split()
