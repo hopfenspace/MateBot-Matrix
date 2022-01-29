@@ -2,7 +2,6 @@
 MateBot's CommandParser
 """
 
-import typing
 import inspect
 import html.parser
 from typing import List
@@ -32,7 +31,7 @@ class CommandParser(Representable):
         self._usages = [CommandUsage()]
 
     @property
-    def usages(self) -> typing.List[CommandUsage]:
+    def usages(self) -> List[CommandUsage]:
         """
         Return list of usage objects
         """
@@ -87,7 +86,7 @@ class CommandParser(Representable):
         # Parse
         return await self._parse(arg_strings, bot)
 
-    async def _parse(self, arg_strings: typing.List[str], bot: MateBot) -> Namespace:
+    async def _parse(self, arg_strings: List[str], bot: MateBot) -> Namespace:
         """
         Internal function for parsing from a list of strings.
 
@@ -129,7 +128,7 @@ class CommandParser(Representable):
                 msg += f"\n`/{self._name} {usage}` {error}"
             raise ParsingError(msg)
 
-    async def _parse_usage(self, usage: CommandUsage, arg_strings: typing.List[str], bot: MateBot) -> Namespace:
+    async def _parse_usage(self, usage: CommandUsage, arg_strings: List[str], bot: MateBot) -> Namespace:
         """
         Try to parse the arguments with a usage
 
@@ -152,7 +151,7 @@ class CommandParser(Representable):
         for action in usage.actions:
             setattr(namespace, action.dest, action.default)
 
-        async def consume_action(local_action: Action, strings: typing.List[str]):
+        async def consume_action(local_action: Action, strings: List[str]):
             """
             Use an action to consume as many argument strings as possible
             """

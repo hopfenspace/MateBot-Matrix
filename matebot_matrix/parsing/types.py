@@ -21,6 +21,15 @@ __amount_pattern = re.compile(r"^(\d+)(?:[,.](\d)(\d)?)?$")
 # 1st group: leading number, 2nd group: 1st decimal, 3rd group: 2nd decimal
 
 
+__user_reference_pattern = re.compile(r"^<a .*href=\"https://matrix.to/#/(@\S+:\S+\.\w\w+)\".*>(.+)</a>$")
+# Regex explanation:
+# Any opening & closing HTML <a> tag with the 'href' attribute and some
+# valid-looking target and at least one character in its tag body
+#
+# The match's groups:
+# 1st group: the username that was annotated, 2nd group: content of the HTML tag (probably human-readable name)
+
+
 def amount(arg: str, **_) -> int:
     """
     Convert the string into an amount of money.
@@ -81,7 +90,10 @@ async def user(arg: str, bot: MateBot) -> User:
     """
 
     try:
-        return await bot.sdk.get_user_by_app_alias(arg)
+        match = __user_reference_pattern.match(arg.lower())
+        if match is None:
+            return await bot.sdk.get_user_by_app_alias(arg.lower())
+        return await bot.sdk.get_user_by_app_alias(match.group(1))
     except UserAPIException as exc:
         raise ValueError(exc.message) from exc
 
