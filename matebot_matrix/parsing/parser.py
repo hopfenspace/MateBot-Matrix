@@ -4,10 +4,12 @@ MateBot's CommandParser
 
 import typing
 import inspect
+import html.parser
+from typing import List
 
 from nio import RoomMessageText
 
-from .util import EntityString, Namespace, Representable
+from .util import Namespace, Representable
 from .usage import CommandUsage
 from .actions import Action
 from .formatting import plural_s
@@ -77,7 +79,7 @@ class CommandParser(Representable):
         """
 
         # Split message into argument strings
-        arg_strings = list(self._split(msg))
+        arg_strings = _split_message(msg)
 
         # Remove bot command
         arg_strings = arg_strings[1:]
@@ -220,29 +222,70 @@ class CommandParser(Representable):
 
         return namespace
 
-    @staticmethod
-    def _split(event: RoomMessageText) -> typing.Iterator[EntityString]:
-        """
-        Currently unused.
 
-        :param event: event to process
-        :type event: nio.RoomMessageText
-        :return: list of argument strings
-        :rtype: Iterator[EntityString]
-        """
+def _split_message(event: RoomMessageText) -> List[str]:
+    """
+    Split a room message text into a list of strings
 
-        """last_entity = 0
+    This function keeps <a> tags and their attributes in formatted HTML
+    intact and also removes all other HTML tags and attributes. If no
+    formatted message is found, the plain text version will be split.
 
-        for entity in msg.entities:
-            # If there is normal text left before the next entity
-            if last_entity < entity.offset:
-                yield from map(EntityString, filter(bool, msg.text[last_entity:entity.offset].split()))
+    Note that nested <a> tags are not well supported, as they should
+    not be found in the protocol anyways. For example, the following
+    formatted text '<a>1<a>2</a>3</a>' would yield the list of strings
+    ['<a>2</a>', '<a>3</a>'], i.e. the "1" would be discarded.
 
-            yield EntityString(msg.text[entity.offset:entity.offset + entity.length], entity)
-            last_entity = entity.offset + entity.length
+    :param event: event to process
+    :type event: nio.RoomMessageText
+    :return: list of argument strings
+    :rtype: List[str]
+    """
 
-        # Return left over text which might be after the last entity
-        if msg.text[last_entity:]:
-            yield from map(EntityString, filter(bool, msg.text[last_entity:].split()))"""
+    class MatrixReferenceElement:
+        def __init__(self, attrs: List[tuple], data: str):
+            self.attrs = attrs
+            self.data = data
 
-        yield from event.stripped_body.split()
+    class MatrixFormattedMessageParser(html.parser.HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.elements = []
+            self.open_tags = []
+
+        @staticmethod
+        def _format_attr(attr: tuple) -> str:
+            return f"{attr[0]}=\"{attr[1]}\""
+
+        def error(self, message):
+            raise ValueError(message)
+
+        def handle_starttag(self, tag: str, attrs: List[tuple]):
+            if tag.lower() == "a":
+                self.open_tags.append(MatrixReferenceElement(attrs, ""))
+
+        def handle_endtag(self, tag: str):
+            if tag.lower() == "a":
+                if self.open_tags:
+                    entry = self.open_tags.pop()
+                    attrs = ' '.join(map(self._format_attr, entry.attrs))
+                    space = " " if attrs else ""
+                    self.elements.append(f"<a{space}{attrs}>{entry.data}</a>")
+                else:
+                    raise ValueError("HTML parser error: unopened tag")
+
+        def handle_data(self, data):
+            if not self.open_tags:
+                self.elements.extend(data.split())
+            else:
+                self.open_tags[-1].data = data
+
+    if event.formatted_body:
+        p = MatrixFormattedMessageParser()
+        p.feed(event.formatted_body)
+        if p.open_tags:
+            raise ValueError("HTML parser error: unclosed tag")
+        return p.elements
+
+    else:
+        return event.stripped_body.split()
