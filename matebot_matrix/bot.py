@@ -1,11 +1,32 @@
 import logging
-from typing import Optional, Type
+from typing import Callable, Optional, Type
 
 from matebot_sdk.sdk import AsyncSDK
 from hopfenmatrix.config import Config
-from hopfenmatrix.matrix import MatrixBot
+from hopfenmatrix.matrix import EventType, MatrixBot, MatrixRoom, RoomMessageText
 
 from .config import MateBotConfig
+
+
+def _replace_html(msg: str) -> str:
+    replacements = {
+        "<br/>": "\n",
+        "<pre>": "```",
+        "</pre>": "```",
+        "<code>": "`",
+        "</code>": "`",
+        "<i>": "_",
+        "</i>": "_",
+        "<em>": "_",
+        "</em>": "_",
+        "<b>": "*",
+        "</b>": "*",
+        "<strong>": "*",
+        "</strong>": "*",
+    }
+    for k in replacements:
+        msg = msg.replace(k, replacements[k])
+    return msg
 
 
 class MateBot(MatrixBot):
@@ -40,6 +61,22 @@ class MateBot(MatrixBot):
                 self.config.api.callback.password
             ),
             logger=logging.getLogger("sdk")
+        )
+
+    async def reply(
+            self,
+            formatted_message: str,
+            room: MatrixRoom,
+            event: RoomMessageText,
+            replace_html: Callable[[str], str] = None
+    ) -> None:
+        replace_html = replace_html or _replace_html
+        return await self.send_reply(
+            replace_html(formatted_message),
+            room.room_id,
+            event,
+            formatted_message=formatted_message,
+            send_as_notice=True
         )
 
     def run(self):
