@@ -124,10 +124,11 @@ class CommandParser(Representable):
             if len(self._usages):
                 msg = ""
             else:
-                msg = "No usage applies:"
+                msg = "No usage applies:<br/>"
 
-            for usage, error in zip(self._usages, errors):
-                msg += f"\n`/{self._name} {usage}` {error}"
+            msg += "<br/>".join(
+                f"<code>{self._name} {usage}</code> {error}" for usage, error in zip(self._usages, errors)
+            )
             raise ParsingError(msg)
 
     async def _parse_usage(self, usage: CommandUsage, arg_strings: List[str], bot: MateBot) -> Namespace:

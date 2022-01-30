@@ -30,6 +30,18 @@ __user_reference_pattern = re.compile(r"^<a .*href=\"https://matrix.to/#/(@\S+:\
 # 1st group: the username that was annotated, 2nd group: content of the HTML tag (probably human-readable name)
 
 
+def string(arg: str, **_) -> str:
+    return str(arg)
+
+
+def lowercase(arg: str, **_) -> str:
+    return str(arg).lower()
+
+
+def uppercase(arg: str, **_) -> str:
+    return str(arg).upper()
+
+
 def amount(arg: str, **_) -> int:
     """
     Convert the string into an amount of money.

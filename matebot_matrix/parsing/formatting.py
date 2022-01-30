@@ -101,17 +101,17 @@ def format_action(action: Action) -> str:
     metavar = get_metavar(action)
     nargs = action.nargs
 
-    # if action.choices is not None:
-    #     arg = "({})"
-    if isinstance(nargs, int) and action.nargs > 0:
-        arg = " ".join("<{0}>" for _ in range(nargs))
+    if action.choices is not None:
+        return f"{'|'.join(action.choices)}"
+    elif isinstance(nargs, int) and action.nargs > 0:
+        arg = " ".join("{{{0}}}" for _ in range(nargs))
     else:
         try:
             arg = {
-                None: "<{}>",
+                None: "{{{}}}",
                 "?":  "[{}]",
                 "*":  "[{} ...]",
-                "+":  "<{} ...>"
+                "+":  "{{{} ...}}"
             }[nargs]
         except KeyError:
             raise ValueError(f"unsupported nargs: {nargs}")
