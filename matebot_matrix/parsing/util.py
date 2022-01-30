@@ -2,8 +2,6 @@
 Collection of simple utility classes
 """
 
-from typing import Optional
-
 
 class Representable(object):
     """
@@ -54,31 +52,6 @@ class Representable(object):
 
     def _get_args(self):
         return []
-
-
-class EntityString(Representable, str):
-    """
-    Extends ``str`` to add a telegram's MessageEntity in the constructor
-
-    A CommandParser hands these objects as parameters for "type" functions. \
-    This object is a string so functions like ``int`` which expect a single string can still be used, \
-    while other function can access the entity if they need it.
-
-    :param string: the base string
-    :type string: str
-    :param entity: the telegram MessageEntity (Optional)
-    :type entity: MessageEntity
-    """
-
-    def __new__(cls, string: str, entity: Optional[object] = None) -> "EntityString":
-        return str.__new__(cls, string)
-
-    def __init__(self, string: str, entity: Optional[object] = None):
-        super(EntityString, self).__init__()
-        self.entity = entity
-
-    def _get_args(self):
-        return [str(self)]
 
 
 class Namespace(Representable):
