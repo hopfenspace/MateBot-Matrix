@@ -1,18 +1,13 @@
 """
-MateBot command executor classes for /blame
+MateBot command executor for blame
 """
 
-import logging
+from matebot_sdk.base import PermissionLevel
+from hopfenmatrix.matrix import MatrixRoom, RoomMessageText
 
-from nio import MatrixRoom, RoomMessageText
-from hopfenmatrix.api_wrapper import ApiWrapper
-
-from mate_bot.commands.base import BaseCommand, INTERNAL
-from mate_bot.parsing.util import Namespace
-from mate_bot.state import User
-
-
-logger = logging.getLogger("commands")
+from .base import BaseCommand
+from ..bot import MateBot
+from ..parsing.util import Namespace
 
 
 class BlameCommand(BaseCommand):
@@ -23,39 +18,28 @@ class BlameCommand(BaseCommand):
     def __init__(self):
         super().__init__(
             "blame",
-            "Use this command to show the user(s) with the highest debts.\n\n"
-            "Put the user(s) with the highest debts to the pillory and make them "
-            "settle their debts, e.g. by buying stuff like new bottle crates. "
-            "This command can only be executed by internal users.",
-            "Use this command to show the user(s) with the highest debts.\n\n"
+            "Use this command to show the user(s) with the highest debts.<br/>"
             "Put the user(s) with the highest debts to the pillory and make them "
             "settle their debts, e.g. by buying stuff like new bottle crates. "
             "This command can only be executed by internal users."
         )
 
-    async def run(self, args: Namespace, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
-        """
-        :param args: parsed namespace containing the arguments
-        :type args: argparse.Namespace
-        :param api: the api to respond with
-        :type api: hopfenmatrix.api_wrapper.ApiWrapper
-        :param room: room the message came in
-        :type room: nio.MatrixRoom
-        :param event: incoming message event
-        :type event: nio.RoomMessageText
-        :return: None
-        """
-        user = await self.get_sender(api, room, event)
+    async def run(self, args: Namespace, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> None:
+        sender = await bot.sdk.get_user_by_app_alias(event.sender)
 
-        if not await self.ensure_permissions(user, INTERNAL, api, event, room):
+        check = bot.sdk.ensure_permissions(sender, PermissionLevel.ANY_INTERNAL, "blame")
+        if not check[0]:
+            await bot.reply(check[1], room, event)
             return
 
-        debtors = User.put_blame()
-
-        if len(debtors) == 1:
-            msg = "The user with the highest debt is:\n"
+        users = await bot.sdk.get_users()
+        min_balance = min(users, key=lambda u: u.balance).balance
+        debtors = [user for user in users if user.balance <= min_balance and user.balance < 0]
+        if len(debtors) == 0:
+            msg = "Good news! No one has to be blamed, all users have positive balances!"
+        elif len(debtors) == 1:
+            msg = f"The user with the highest debt is:<br/>{bot.sdk.get_username(debtors[0])}"
         else:
-            msg = "The users with the highest debts are:\n"
-        msg += "\n".join(map(str, debtors))
+            msg = f"The users with the highest debts are:<br/>{', '.join(map(bot.sdk.get_username, debtors))}"
 
-        await api.send_reply(msg, room, event, send_as_notice=True)
+        await bot.reply(msg, room, event)

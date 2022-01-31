@@ -3,6 +3,7 @@ Collection of command executors
 """
 
 from .balance import BalanceCommand
+from .blame import BlameCommand
 from .consume import ConsumeCommand
 from .default import DefaultCommand
 from .help import HelpCommand
@@ -13,6 +14,7 @@ from .start import StartCommand
 COMMANDS = {
     cmd.name: cmd for cmd in [
         BalanceCommand(),
+        BlameCommand(),
         ConsumeCommand(),
         HelpCommand(),
         SendCommand(),
