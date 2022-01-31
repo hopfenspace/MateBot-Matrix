@@ -65,7 +65,7 @@ class HelpCommand(BaseCommand):
                 if user.external:
                     msg += "<br/>You are an external user. Some commands may be restricted."
 
-                    if user.creditor is None:
+                    if user.voucher_id is None:
                         msg += (
                             "<br/>You don't have any creditor. Your possible interactions "
                             "with the bot are very limited for security purposes. You "
