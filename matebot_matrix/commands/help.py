@@ -9,7 +9,7 @@ from matebot_sdk.exceptions import UserAPIException
 from .base import BaseCommand
 from ..bot import MateBot
 from ..parsing.util import Namespace
-from ..parsing.types import command as command_type
+from ..parsing.types import command as command_type, string
 
 
 class HelpCommand(BaseCommand):
@@ -26,6 +26,7 @@ class HelpCommand(BaseCommand):
         )
 
         self.parser.add_argument("command", type=command_type, nargs="?")
+        self.parser.add_argument("catchall", type=string, nargs="*", metavar="text")
 
     async def run(self, args: Namespace, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> None:
         if args.command:
