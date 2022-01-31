@@ -5,6 +5,9 @@ from .commands import COMMANDS
 from .callback import APICallbackDispatcher, get_callback_app
 
 
+THREAD_JOIN_TIMEOUT: float = 1.0
+
+
 def main():
     bot = MateBot()
     bot.set_auto_join()
@@ -25,6 +28,8 @@ def main():
         bot.logger.warning("Username & password authentication for callbacks is not supported yet!")
     dispatcher.start_async_thread(app, bot.config.api.callback.address, bot.config.api.callback.port)
     bot.run()
+    dispatcher.event_thread_running.set()
+    dispatcher.event_thread.join(THREAD_JOIN_TIMEOUT)
 
 
 if __name__ == "__main__":

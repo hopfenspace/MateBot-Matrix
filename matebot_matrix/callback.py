@@ -22,7 +22,7 @@ STORAGE_TYPE = Dict[
 class APICallbackDispatcher:
     def __init__(self, bot: MateBot):
         self.bot = bot
-        self.logger = logging.getLogger("api-callback")
+        self.logger = logging.getLogger("callback")
         self._storage: STORAGE_TYPE = collections.defaultdict(list)
 
         self.event_thread: Optional[threading.Thread] = None
@@ -51,11 +51,11 @@ class APICallbackDispatcher:
                         raise
 
     async def run_async(self, app: web.Application, host: str, port: int):
-        print("run async")
         self.event_loop = asyncio.get_event_loop()
         self.logger.debug(f"Event loop {self.event_loop} of {threading.current_thread()} has been attached to {self}")
         self.event_thread_started.set()
 
+        self.logger.debug("Starting callback server...")
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, host, port)
@@ -64,20 +64,21 @@ class APICallbackDispatcher:
         self.logger.debug(f"Sleeping until {self.event_thread_running} gets set...")
         while not self.event_thread_running.is_set():
             await asyncio.sleep(ASYNC_SLEEP_DURATION)
+
         self.logger.debug("Stopping callback server...")
         await site.stop()
-        self.logger.info(f"Closing async thread {threading.current_thread()}...")
+        self.logger.debug(f"Closing async runner thread {threading.current_thread()}...")
 
     def start_async_thread(self, app: web.Application, host: str, port: int, daemon: bool = True, name: str = None):
         if self.event_thread is not None:
             raise RuntimeError("Server thread already running")
-        print("start thread")
         self.event_thread = threading.Thread(
             target=lambda: asyncio.run(self.run_async(app, host, port)),
             name=name,
             daemon=daemon
         )
         self.event_thread.start()
+        self.logger.info("Started callback server thread")
 
 
 def get_callback_app(dispatcher: APICallbackDispatcher, logger: logging.Logger):
