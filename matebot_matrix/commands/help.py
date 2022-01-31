@@ -1,33 +1,25 @@
 """
-MateBot command executor classes for /help
+MateBot command executor for help
 """
 
-import logging
+from hopfenmatrix.callbacks import CommandCallback
+from hopfenmatrix.matrix import MatrixRoom, RoomMessageText
+from matebot_sdk.exceptions import UserAPIException
 
-from nio import RoomMessageText, MatrixRoom
-from hopfenmatrix.api_wrapper import ApiWrapper
-
-from mate_bot.state import User
-from mate_bot import registry
-from mate_bot.commands.base import BaseCommand
-from mate_bot.parsing.types import command as command_type
-from mate_bot.parsing.util import Namespace
-
-
-logger = logging.getLogger("commands")
+from .base import BaseCommand
+from ..bot import MateBot
+from ..parsing.util import Namespace
+from ..parsing.types import command as command_type
 
 
 class HelpCommand(BaseCommand):
     """
-    Command executor for /help
+    Command executor for help
     """
 
     def __init__(self):
         super().__init__(
             "help",
-            "The help command prints the help page for any "
-            "command. If no argument is passed, it will print its "
-            "usage and a list of all available commands.",
             "The <code>help</code> command prints the help page for any "
             "command. If no argument is passed, it will print its "
             "usage and a list of all available commands."
@@ -35,49 +27,53 @@ class HelpCommand(BaseCommand):
 
         self.parser.add_argument("command", type=command_type, nargs="?")
 
-    async def run(self, args: Namespace, api: ApiWrapper, room: MatrixRoom, event: RoomMessageText) -> None:
-        """
-        :param args: parsed namespace containing the arguments
-        :type args: argparse.Namespace
-        :param api: the api to respond with
-        :type api: hopfenmatrix.api_wrapper.ApiWrapper
-        :param room: room the message came in
-        :type room: nio.MatrixRoom
-        :param event: incoming message event
-        :type event: nio.RoomMessageText
-        :return: None
-        """
-        user = await self.get_sender(api, room, event)
-
+    async def run(self, args: Namespace, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> None:
         if args.command:
-            usages = "\n".join(map(lambda x: f"{api.config.matrix.command_prefix} {args.command.name} {x}", args.command.parser.usages))
-            usages_formatted = "<br />".join(map(lambda x: f"<code>{api.config.matrix.command_prefix} {args.command.name} {x}</code>", args.command.parser.usages))
-            msg = f"Usages:\n{usages}\n\nDescription:\n{args.command.description}"
-            msg_formatted = f"<em>Usages:</em><br />{usages_formatted}<br /><br /><em>Description:</em><br />{args.command.description_formatted}"
+            usages = "<br/>".join(map(
+                lambda usage: f"<code>{bot.config.matrix.command_prefix} {args.command.name} {usage}</code>",
+                args.command.parser.usages
+            ))
+            msg = f"Help on command <b>{args.command.name}</b><br/><br/><em>Usages:</em><br/>{usages}" \
+                  f"<br/><br/><em>Description:</em><br/>{args.command.description}<br>"
 
         else:
-            command_list = "\n".join(map(lambda c: f" - {c}", sorted(registry.commands.keys())))
-            msg = f"{self.usage}\n\nList of commands:\n\n{command_list}"
-            msg_formatted = f"{self.usage}<br /><br /><em>List of commands:</em><br /><br />{command_list}"
+            try:
+                user = await bot.sdk.get_user_by_app_alias(event.sender)
+            except UserAPIException:
+                user = None
 
-            if user.external:
-                msg += "\n\nYou are an external user. Some commands may be restricted."
-                msg_formatted += "<br /><br />You are an external user. Some commands may be restricted."
+            def get_name(cmd: CommandCallback) -> str:
+                if isinstance(cmd.accepted_aliases, str):
+                    return f"<b>{cmd.accepted_aliases}</b>"
+                return f"<b>{', '.join(cmd.accepted_aliases)}</b>"
 
-                if user.creditor is None:
-                    msg += (
-                        f"\nYou don't have any creditor. Your possible interactions "
-                        f"with the bot are very limited for security purposes. You "
-                        f"can ask some internal user to act as your voucher. To "
-                        f"do this, the internal user needs to execute {api.config.matrix.command_prefix} vouch "
-                        f"<your username>. Afterwards, you may use this bot."
-                    )
-                    msg_formatted += (
-                        f"<br />You don't have any creditor. Your possible interactions "
-                        f"with the bot are very limited for security purposes. You "
-                        f"can ask some internal user to act as your voucher. To "
-                        f"do this, the internal user needs to execute <code>{api.config.matrix.command_prefix} vouch "
-                        f"<your username></code>. Afterwards, you may use this bot."
-                    )
+            def get_syntax(cmd: CommandCallback) -> str:
+                # TODO: add support for commands with multiple usages
+                return (cmd.command_syntax or "") and f"<code>{cmd.command_syntax}</code>"
 
-        await api.send_reply(msg, room, event, formatted_message=msg_formatted, send_as_notice=True)
+            commands = [
+                f"<li>{get_name(command)}:<br/>{get_syntax(command)}<br/>{command.description}</li>"
+                for command in bot.command_callbacks
+            ]
+
+            msg = f"{bot.config.matrix.bot_description}<br/><br/><code>{self.usage}</code><br/>" \
+                  f"<br/><em>List of commands:</em><br/><ul>{''.join(commands)}</ul>"
+
+            if user:
+                if user.external:
+                    msg += "<br/>You are an external user. Some commands may be restricted."
+
+                    if user.creditor is None:
+                        msg += (
+                            "<br/>You don't have any creditor. Your possible interactions "
+                            "with the bot are very limited for security purposes. You "
+                            "can ask some internal user to act as your voucher. To "
+                            "do this, the internal user needs to execute <code>vouch add "
+                            "{your username}</code>. Afterwards, you may use this bot."
+                        )
+
+            else:
+                msg += "<br/><b>You are currently not registered.</b><br/>Please see the " \
+                       "help page of the <code>start</code> command to see how you register yourself."
+
+        await bot.reply(msg, room, event)

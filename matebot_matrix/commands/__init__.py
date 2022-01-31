@@ -3,11 +3,15 @@ Collection of command executors
 """
 
 from .balance import BalanceCommand
+from .help import HelpCommand
+from .start import StartCommand
 
 
 COMMANDS = {
     cmd.name: cmd for cmd in [
-        BalanceCommand()
+        BalanceCommand(),
+        HelpCommand(),
+        StartCommand()
     ]
 }
 

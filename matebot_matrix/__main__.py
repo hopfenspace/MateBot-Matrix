@@ -8,7 +8,10 @@ def main():
 
     for name in COMMANDS:
         cmd = COMMANDS[name]
-        bot.register_command(cmd, name, description=cmd.description, command_syntax=cmd.usage)
+        if name == "help":
+            bot.register_command(cmd, name, description=cmd.description, command_syntax=cmd.usage, make_default=True)
+        else:
+            bot.register_command(cmd, name, description=cmd.description, command_syntax=cmd.usage)
 
     bot.run()
 
