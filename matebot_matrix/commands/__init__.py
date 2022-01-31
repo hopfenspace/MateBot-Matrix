@@ -11,6 +11,7 @@ from .help import HelpCommand
 from .history import HistoryCommand
 from .send import SendCommand
 from .start import StartCommand
+from .zwegat import ZwegatCommand
 
 
 COMMANDS = {
@@ -22,7 +23,8 @@ COMMANDS = {
         HelpCommand(),
         HistoryCommand(),
         SendCommand(),
-        StartCommand()
+        StartCommand(),
+        ZwegatCommand()
     ]
 }
 
