@@ -10,6 +10,7 @@ from .config import MateBotConfig
 
 def _replace_html(msg: str) -> str:
     replacements = {
+        "&emsp;": "\t",
         "<br/>": "\n",
         "<pre>": "```",
         "</pre>": "```",
@@ -23,6 +24,10 @@ def _replace_html(msg: str) -> str:
         "</b>": "*",
         "<strong>": "*",
         "</strong>": "*",
+        "<ul>": "\n",
+        "</ul>": "\n",
+        "<li>": "\t- ",
+        "</li>": "\n\n"
     }
     for k in replacements:
         msg = msg.replace(k, replacements[k])
@@ -68,15 +73,17 @@ class MateBot(MatrixBot):
             formatted_message: str,
             room: MatrixRoom,
             event: RoomMessageText,
-            replace_html: Callable[[str], str] = None
+            replace_html: Callable[[str], str] = None,
+            send_as_notice: bool = True
     ) -> None:
         replace_html = replace_html or _replace_html
+        plain_message = replace_html(formatted_message).rstrip()
         return await self.send_reply(
-            replace_html(formatted_message),
+            plain_message,
             room.room_id,
             event,
             formatted_message=formatted_message,
-            send_as_notice=True
+            send_as_notice=send_as_notice
         )
 
     def run(self):

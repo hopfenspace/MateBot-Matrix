@@ -34,7 +34,7 @@ class HelpCommand(BaseCommand):
                 args.command.parser.usages
             ))
             msg = f"Help on command <b>{args.command.name}</b><br/><br/><em>Usages:</em><br/>{usages}" \
-                  f"<br/><br/><em>Description:</em><br/>{args.command.description}<br>"
+                  f"<br/><br/><em>Description:</em><br/>{args.command.description}<br/>"
 
         else:
             try:

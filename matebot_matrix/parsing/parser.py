@@ -83,7 +83,8 @@ class CommandParser(Representable):
         # Remove bot command
         if arg_strings[0] == bot.config.matrix.command_prefix:
             arg_strings.pop(0)
-        arg_strings.pop(0)
+        if arg_strings:
+            arg_strings.pop(0)
 
         # Parse
         return await self._parse(arg_strings, bot)
