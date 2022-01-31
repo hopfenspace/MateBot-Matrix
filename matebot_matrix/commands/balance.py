@@ -1,5 +1,5 @@
 """
-MateBot command executor for !balance
+MateBot command executor for balance
 """
 
 from hopfenmatrix.matrix import MatrixRoom, RoomMessageText
@@ -12,22 +12,17 @@ from ..parsing.util import Namespace
 
 class BalanceCommand(BaseCommand):
     """
-    Command executor for !balance
+    Command executor for balance
     """
 
     def __init__(self):
         super().__init__(
             "balance",
-            "Use this command to show a user's balance.\n\n"
+            "Use this command to show a user's balance.<br/>"
             "When you use this command without arguments, the bot will "
             "reply with your current amount of money stored in your virtual "
             "wallet. If you specify a username or mention someone as an argument, "
-            "the 'balance' of this user is returned instead of yours.",
-            "Use this command to show a user's balance.\n\n"
-            "When you use this command without arguments, the bot will "
-            "reply with your current amount of money stored in your virtual "
-            "wallet. If you specify a username or mention someone as an argument, "
-            "the 'balance' of this user is returned instead of yours."
+            "the balance of this user is returned instead of yours.",
         )
 
         self.parser.add_argument("user", type=user_type, nargs="?")
@@ -39,4 +34,4 @@ class BalanceCommand(BaseCommand):
             user = await bot.sdk.get_user_by_app_alias(event.sender)
             msg = f"Your balance is: {user.balance / 100 :.2f}€"
 
-        await bot.send_reply(msg, room.room_id, event, send_as_notice=True)
+        await bot.reply(msg, room, event)

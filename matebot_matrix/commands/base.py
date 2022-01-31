@@ -32,23 +32,20 @@ class BaseCommand:
                 self.parser.add_argument("number", type=int)
 
             async def run(self, args: Namespace, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> None:
-                await bot.send_reply(" ".join(["Example!"] * max(1, args.number)), room.room_id, event)
+                await bot.reply("<br/>".join(["Example!"] * max(1, args.number)), room, event)
 
-    :param name: name of the command (without the "/")
+    :param name: name of the command (without the bot prefix)
     :type name: str
-    :param description: a multiline string describing what the command does
+    :param description: a multiline string describing what the command does, formatted with HTML
     :type description: str
-    :param description_formatted: a multiline string describing what the command does. Formatted with html.
-    :type description_formatted: str
-    :param usage: a single line string showing the basic syntax
+    :param usage: an optional single line string showing the basic syntax
     :type usage: Optional[str]
     """
 
-    def __init__(self, name: str, description: str, description_formatted: str, usage: Optional[str] = None):
+    def __init__(self, name: str, description: str, usage: Optional[str] = None):
         self.name = name
         self._usage = usage
         self.description = description
-        self.description_formatted = description_formatted
         self.logger = logging.getLogger(f"commands.{self.name}")
         self.parser = CommandParser(self.name)
 
@@ -105,19 +102,19 @@ class BaseCommand:
             await self.run(args, bot, room, event)
 
         except ParsingError as exc:
-            await bot.send_reply(str(exc), room.room_id, event, send_as_notice=True)
+            await bot.reply(str(exc), room, event)
 
         except APIConnectionException as exc:
             self.logger.exception(f"API connectivity problem @ {type(self).__name__} ({exc.exc})")
-            await bot.send_reply(f"I'm having networking problems. {exc.message}", room.room_id, event)
+            await bot.reply(f"<i>I'm having networking problems.</i><br/>{exc.message}", room, event)
 
         except UserAPIException as exc:
             self.logger.debug(f"{type(exc).__name__}: {exc.message} ({exc.status}, {exc.details})")
-            await bot.send_reply(exc.message, room.room_id, event)
+            await bot.reply(exc.message, room, event)
 
         except APIException as exc:
             self.logger.warning(f"APIException @ {type(self).__name__} ({exc.status}, {exc.details})", exc_info=True)
-            await bot.send_reply(f"The command couldn't be executed.\n{exc.message}", room.room_id, event)
+            await bot.reply(f"The command couldn't be executed.<br/>{exc.message}", room, event, send_as_notice=False)
 
     '''
     async def get_sender(self, bot: MateBot, room: MatrixRoom, event: RoomMessageText) -> User:
