@@ -5,6 +5,7 @@ Collection of command executors
 from .balance import BalanceCommand
 from .blame import BlameCommand
 from .consume import ConsumeCommand
+from .data import DataCommand
 from .default import DefaultCommand
 from .help import HelpCommand
 from .send import SendCommand
@@ -16,6 +17,7 @@ COMMANDS = {
         BalanceCommand(),
         BlameCommand(),
         ConsumeCommand(),
+        DataCommand(),
         HelpCommand(),
         SendCommand(),
         StartCommand()
