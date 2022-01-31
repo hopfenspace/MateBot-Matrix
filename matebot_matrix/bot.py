@@ -1,9 +1,10 @@
+import asyncio
 import logging
 from typing import Callable, Optional, Type
 
 from matebot_sdk.sdk import AsyncSDK
 from hopfenmatrix.config import Config
-from hopfenmatrix.matrix import EventType, MatrixBot, MatrixRoom, RoomMessageText
+from hopfenmatrix.matrix import MatrixBot, MatrixRoom, RoomMessageText
 
 from .config import MateBotConfig
 
