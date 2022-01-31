@@ -8,6 +8,7 @@ from .consume import ConsumeCommand
 from .data import DataCommand
 from .default import DefaultCommand
 from .help import HelpCommand
+from .history import HistoryCommand
 from .send import SendCommand
 from .start import StartCommand
 
@@ -19,6 +20,7 @@ COMMANDS = {
         ConsumeCommand(),
         DataCommand(),
         HelpCommand(),
+        HistoryCommand(),
         SendCommand(),
         StartCommand()
     ]
