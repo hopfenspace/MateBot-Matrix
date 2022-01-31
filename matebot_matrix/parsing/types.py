@@ -4,8 +4,9 @@ See :class:`mate_bot.parsing.actions.Action`'s type parameter
 """
 
 import re
+from typing import Union
 
-from matebot_sdk.schemas import User
+from matebot_sdk.schemas import Consumable, User
 from matebot_sdk.exceptions import UserAPIException
 
 from ..bot import MateBot
@@ -31,20 +32,47 @@ __user_reference_pattern = re.compile(r"^<a .*href=\"https://matrix.to/#/(@\S+:\
 
 
 def string(arg: str, **_) -> str:
+    """
+    Return the string as-is
+
+    :param arg: string to be parsed
+    :type arg: str
+    :return: same string
+    :rtype: str
+    """
+
     return str(arg)
 
 
 def lowercase(arg: str, **_) -> str:
+    """
+    Return the lowercase string
+
+    :param arg: string to be parsed
+    :type arg: str
+    :return: string in lowercase
+    :rtype: str
+    """
+
     return str(arg).lower()
 
 
 def uppercase(arg: str, **_) -> str:
+    """
+    Return the uppercase string
+
+    :param arg: string to be parsed
+    :type arg: str
+    :return: string in uppercase
+    :rtype: str
+    """
+
     return str(arg).upper()
 
 
 def amount(arg: str, **_) -> int:
     """
-    Convert the string into an amount of money.
+    Convert the string into an amount of money
 
     A maximum allowed amount, this function accepts, is set in the config.
 
@@ -93,7 +121,7 @@ async def user(arg: str, bot: MateBot) -> User:
     Convert the string into a MateBot user as defined in the ``state`` package
 
     :param arg: string to be parsed
-    :type arg: EntityString
+    :type arg: str
     :param bot: MateBot to allow querying the API server
     :type arg: matebot_matrix.bot.MateBot
     :return: fully functional MateBot user
@@ -126,3 +154,24 @@ def command(arg: str, **_) -> BaseCommand:
         return COMMANDS[arg.lower()]
     except KeyError:
         raise ValueError(f"{arg} is an unknown command")
+
+
+async def extended_consumable_type(arg: str, bot: MateBot) -> Union[Consumable, str]:
+    """
+    Convert the string into a consumable schema, if found, or the special string "?"
+
+    :param arg: the desired consumable's name
+    :type arg: str
+    :param bot: MateBot to allow querying the API server
+    :type arg: matebot_matrix.bot.MateBot
+    :return: the found consumable schema or the fixed special string "?"
+    :rtype: Union[matebot_sdk.schemas.Consumable, str]
+    :raises ValueError: when the consumable wasn't found or the string isn't "?"
+    """
+
+    if arg.strip() == "?":
+        return "?"
+    for consumable in await bot.sdk.get_consumables():
+        if consumable.name.lower() == arg.lower():
+            return consumable
+    raise ValueError(f"{arg} is no known consumable")
