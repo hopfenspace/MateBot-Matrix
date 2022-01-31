@@ -6,6 +6,7 @@ from .balance import BalanceCommand
 from .consume import ConsumeCommand
 from .default import DefaultCommand
 from .help import HelpCommand
+from .send import SendCommand
 from .start import StartCommand
 
 
@@ -14,6 +15,7 @@ COMMANDS = {
         BalanceCommand(),
         ConsumeCommand(),
         HelpCommand(),
+        SendCommand(),
         StartCommand()
     ]
 }
