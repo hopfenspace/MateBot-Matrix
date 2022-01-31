@@ -1,7 +1,7 @@
 import logging
 
 from .bot import MateBot
-from .commands import COMMANDS
+from .commands import COMMANDS, DEFAULT_COMMAND
 from .callback import APICallbackDispatcher, get_callback_app
 
 
@@ -17,10 +17,8 @@ def main():
 
     for name in COMMANDS:
         cmd = COMMANDS[name]
-        if name == "help":
-            bot.register_command(cmd, name, description=cmd.description, command_syntax=cmd.usage, make_default=True)
-        else:
-            bot.register_command(cmd, name, description=cmd.description, command_syntax=cmd.usage)
+        bot.register_command(cmd, name, description=cmd.description, command_syntax=cmd.usage)
+    bot.register_command(DEFAULT_COMMAND, "*", make_default=True)
 
     dispatcher = APICallbackDispatcher(bot)
     app = get_callback_app(dispatcher, logging.getLogger("callback"))

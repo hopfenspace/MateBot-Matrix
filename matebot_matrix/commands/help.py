@@ -55,6 +55,7 @@ class HelpCommand(BaseCommand):
             commands = [
                 f"<li>{get_name(command)}:<br/>{get_syntax(command)}<br/>{command.description}</li>"
                 for command in bot.command_callbacks
+                if command.accepted_aliases != "*"
             ]
 
             msg = f"{bot.config.matrix.bot_description}<br/><br/><code>{self.usage}</code><br/>" \
